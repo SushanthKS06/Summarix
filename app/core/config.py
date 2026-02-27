@@ -22,15 +22,18 @@ class Settings(BaseSettings):
     @field_validator("REDIS_URL", mode="before")
     @classmethod
     def auto_correct_redis_url(cls, v: str) -> str:
-        if v and "upstash.io" in v:
+        if not v:
+            return v
+        
+        if "upstash.io" in v and v.startswith("redis://"):
             # Upstash requires rediss:// (SSL) but their default copy-paste is redis://
-            if v.startswith("redis://"):
-                v = v.replace("redis://", "rediss://", 1)
-            # Remove unsupported ssl_cert_reqs=none for redis.asyncio
-            if "?ssl_cert_reqs=none" in v:
-                v = v.replace("?ssl_cert_reqs=none", "")
-            if "&ssl_cert_reqs=none" in v:
-                v = v.replace("&ssl_cert_reqs=none", "")
+            v = v.replace("redis://", "rediss://", 1)
+            
+        # Remove unsupported ssl_cert_reqs for redis.asyncio (fails if connection is not SSL or due to version issues)
+        for param in ["?ssl_cert_reqs=none", "&ssl_cert_reqs=none", 
+                      "?ssl_cert_reqs=CERT_NONE", "&ssl_cert_reqs=CERT_NONE"]:
+            v = v.replace(param, "")
+            
         return v
 
     @field_validator("POSTGRES_URL", mode="before")
