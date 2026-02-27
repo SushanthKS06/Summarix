@@ -25,28 +25,12 @@ class Settings(BaseSettings):
         if not v:
             return v
         
-        import re
-        
-        # Upstash specifically requires rediss:// but gives redis:// in some interfaces
-        if "upstash.io" in v and v.startswith("redis://"):
-            v = v.replace("redis://", "rediss://", 1)
-            
-        # Radically remove ANY ssl connection parameter that causes issues with async redis
-        # or mismatched schemes in celery.
-        # This regex removes ?ssl_cert_reqs=..., &ssl_cert_reqs=..., etc.
-        v = re.sub(r'[?&]ssl_[a-zA-Z0-9_]+=[^&]*', '', v)
-        
-        # If we had parameters but removed them all, the string might end with '?'
-        if v.endswith('?'):
-            v = v[:-1]
-            
-        # Clean up any doubled '?' or '&' just in case
-        v = v.replace("?&", "?").replace("&&", "&")
-        
-        # Celery will still complain if the URL has ssl_ in it somewhere and scheme is redis://
-        if v.startswith("redis://") and ("ssl" in v.lower() or "rediss_cert" in v.lower()):
-            v = v.replace("redis://", "rediss://", 1)
-            
+        # If it's an Upstash URL, or contains any SSL connection parameter, it MUST use rediss:// 
+        # scheme (secure) rather than redis://, otherwise both Celery and Redis-py will throw errors.
+        if v.startswith("redis://"):
+            if "upstash.io" in v or "ssl" in v.lower():
+                v = v.replace("redis://", "rediss://", 1)
+                
         return v
 
     @field_validator("POSTGRES_URL", mode="before")
