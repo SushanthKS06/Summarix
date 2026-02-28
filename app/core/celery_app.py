@@ -16,4 +16,6 @@ celery_app.conf.update(
     enable_utc=True,
     task_track_started=True,
     task_time_limit=3600,
+    broker_use_ssl={"ssl_cert_reqs": "CERT_NONE"},
+    redis_backend_use_ssl={"ssl_cert_reqs": "CERT_NONE"},
 )
