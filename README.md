@@ -30,15 +30,11 @@ A production-ready Telegram bot that acts as your personal AI research assistant
 |           v            | Rate Limits)  |                      |
 |   +-------+-------+   +---------------+                      |
 |   |  Task Queue   |                                          |
-|   |  (Celery)     |   +---------------+   +-------------+   |
-|   +-------+-------+   |   PostgreSQL  |   | Translation |   |
-|           |            |  (Videos +   |   |  Layer +    |   |
-|           v            |   QA History) |   |  Validation |   |
-|   +-------+-------+   +---------------+   +-------------+   |
-|   |  RAG Engine   |                                          |
-|   | (FAISS+Cosine |                                          |
-|   |  +File Lock)  |                                          |
-|   +-------+-------+                                          |
+|   | (Celery)     |   +-------+-------+   |   PostgreSQL  |   | Translation |   |
+|   +-------+-------+   |  RAG Engine   |   |  (Videos +   |   |  Layer +    |   |
+|           |            | (FAISS in     |   |   QA History) |   |  Validation |   |
+|           v            |  Redis)       |   +---------------+   +-------------+   |
+|   +-------+-------+   +---------------+                                          |
 +-----------+----------------------------------------------+---+
             |
             +------------+--------------------+
@@ -57,7 +53,7 @@ The assignment references "OpenClaw" as the suggested framework. After evaluatin
 
 1. **Full Architectural Control**: Building custom allowed me to make precise design decisions (RAG chunking strategy, FAISS with cosine similarity, atomic rate limiting) that would be constrained by an opinionated framework.
 2. **Deep Understanding**: Building from scratch demonstrates a thorough understanding of NLP pipelines, vector search, prompt engineering, and production patterns — rather than just configuring a tool.
-3. **Production Patterns**: The custom stack uses industry-standard patterns (Celery for background processing, Redis Lua scripts for atomicity, file locking for concurrency) that wouldn't be available through a higher-level abstraction.
+3. **Production Patterns**: The custom stack uses industry-standard patterns (Celery for background processing, Redis Lua scripts for atomicity, Redis-backed vector stores for multi-container deployments) that wouldn't be available through a higher-level abstraction.
 4. **Transparency**: Every component is visible, testable, and maintainable — no black boxes.
 
 The core technology stack (transcript extraction → chunking → embedding → vector search → grounded LLM generation) achieves the same end result with better control over quality, cost, and reliability.
@@ -78,14 +74,14 @@ The core technology stack (transcript extraction → chunking → embedding → 
 12. **PostgreSQL Persistence**: Video records and Q&A history saved for long-term analytics.
 13. **Groq API Retry**: Automatic exponential backoff retry on rate limits (429 errors).
 14. **Cosine Similarity Search**: FAISS uses normalized inner product for better semantic matching.
-15. **Concurrent-Safe FAISS**: File locking prevents index corruption between app and Celery worker.
+15. **Multi-Container RAG**: Serialized FAISS indices are shared via Redis, allowing isolated API and Worker containers (e.g. on Railway) to seamlessly access the same vector data.
 
 ## How RAG Works
 
 1. **Fetch**: Extract transcript using `youtube-transcript-api` (cached in Redis for 24h).
 2. **Chunking**: The transcript is tokenized and chunked using `TokenTextSplitter` with overlap — each chunk preserves accurate timestamp metadata via character-offset mapping.
 3. **Embedding**: `SentenceTransformers` (`all-MiniLM-L6-v2`) converts text into vector embeddings locally.
-4. **Vector Store**: Stored in `FAISS` (cosine similarity via L2-normalized inner product) persisted to a shared Docker volume with file locking, enabling both the app and Celery worker to safely access the same index.
+4. **Vector Store**: Stored in `FAISS` (cosine similarity via L2-normalized inner product) and persisted as serialized bytes in **Redis** with a 24-hour TTL, enabling isolated web and worker containers to instantly access RAG memory without needing a shared persistent volume.
 5. **Retrieval**: Top-k semantic search extracts the most relevant chunks for Q&A (5 for questions, 8 for deep dives, 10 for action points).
 6. **Generation**: Context + conversation history fed into Groq's `llama-3.3-70b-versatile` with strict anti-hallucination grounding rules and automatic retry on rate limits.
 
@@ -168,7 +164,7 @@ Bot: ✅ Language set to Hindi. All future responses will be in Hindi.
 ## Design Decisions & Trade-offs
 
 - **aiogram vs python-telegram-bot**: Chosen `aiogram` for its native async integration and simple declarative handler pattern.
-- **FAISS (Cosine) vs Chroma**: Chosen `FAISS` with cosine similarity (L2-normalized inner product) persisted to a shared Docker volume with file locking for safe concurrent access.
+- **FAISS (Cosine) vs Persistent Databases**: Chosen `FAISS` with cosine similarity (L2-normalized inner product). Instead of maintaining a complex dedicated vector database (like Milvus) for a simple Telegram bot, the FAISS index is instantly serialized and cached into **Redis**. This elegantly solves the multi-container data sharing problem on hosts like Railway, without adding infrastructure overhead.
 - **Background Tasks**: Used Celery to offload transcript fetching and embedding, keeping the bot responsive. Added 300s timeout and exponential backoff retry on failures.
 - **LLM-based Translation**: Using Groq's LLM for translation instead of a dedicated API provides higher quality and formatting preservation. Boilerplate strings are cached in memory to minimize API costs.
 - **Token-based Truncation**: Using `tiktoken` for accurate token counting when handling long transcripts, with sentence-boundary preservation.
@@ -202,7 +198,7 @@ Bot: ✅ Language set to Hindi. All future responses will be in Hindi.
 │   ├── rag/
 │   │   ├── chunking.py         # Token-based transcript chunking
 │   │   ├── embeddings.py       # SentenceTransformer embeddings
-│   │   └── vector_store.py     # FAISS vector store (cosine + file lock)
+│   │   └── vector_store.py     # FAISS vector store (Redis-backed)
 │   ├── services/
 │   │   ├── llm.py              # Groq LLM (summary, Q&A, deepdive, actionpoints)
 │   │   ├── translation.py      # Translation + language detection + validation
@@ -250,7 +246,7 @@ python -m pytest tests/ -v
 | Telegram message limit | Auto-splits messages >4000 chars into multiple parts |
 | Unsupported language | Validated against supported set with clear error message |
 | Groq API rate limit | Automatic exponential backoff retry (3 attempts) |
-| FAISS concurrent access | File locking prevents corruption between processes |
+| FAISS Multi-container access | Serialized to Redis to bypass separated filesystem constraints |
 | Missing API keys | App fails fast on startup (no dummy defaults) |
 
 ## Future Improvements
