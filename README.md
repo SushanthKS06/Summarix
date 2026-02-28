@@ -134,34 +134,22 @@ To deploy this bot reliably, use a "Split & Conquer" architecture to separate th
 > **Note**: Replace these placeholders with actual screenshots from your bot interaction.
 
 ### 1. Sending a YouTube Link & Getting a Summary
-```
-User: https://youtube.com/watch?v=XXXXX
-
-Bot:
-🎥 Title: ...
-📌 Key Points:
-- ...
-⏱ Important Timestamps:
-- [0:00] Introduction
-- [2:15] Main topic
-🧠 Core Takeaway: ...
-✅ Actionable Insights:
-- ...
-```
+![Summary Generation 1](asserts/image1.png)
+![Summary Generation 2](asserts/image2.png)
 
 ### 2. Asking a Follow-up Question
-```
-User: What did he say about pricing?
+![Q&A Features 1](asserts/image3.png)
+![Q&A Features 2](asserts/image4.png)
 
-Bot: Based on the video, the speaker mentioned...
-```
+### 3. Action Points & Deep Dive
+![Action Points](asserts/image5.png)
+![Deep Dive](asserts/image6.png)
 
-### 3. Language Switching
-```
-User: /language Hindi
-
-Bot: ✅ Language set to Hindi. All future responses will be in Hindi.
-```
+### 4. Language Switching
+![Language Support 1](asserts/image7.png)
+![Language Support 2](asserts/image8.png)
+![Language Support 3](asserts/image9.png)
+![Language Support 4](asserts/image10.png)
 
 ## Design Decisions & Trade-offs
 
