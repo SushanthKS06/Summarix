@@ -17,27 +17,27 @@ A production-ready Telegram bot that acts as your personal AI research assistant
                     +---------+---------+
                               | Polling
                               v
-+-------------------------------------------------------------+
-|                       FastAPI / aiogram                      |
-|                                                              |
-|   +---------------+   +---------------+   +-------------+   |
-|   | Bot Handlers  |   | Rate Limiter  |   | API Routes  |   |
-|   | (/start,/help |   | (Atomic Lua)  |   | (/health)   |   |
-|   |  /summary,    |   +-------+-------+   +-------------+   |
-|   |  /deepdive,   |          |                               |
-|   |  /actionpoints|          v                               |
-|   |  /language)   |   +-------+-------+                      |
-|   +-------+-------+   | Redis (Cache  |                      |
-|           |            | + Sessions +  |                      |
-|           v            | Rate Limits)  |                      |
-|   +-------+-------+   +---------------+                      |
-|   |  Task Queue   |                                          |
-|   | (Celery)     |   +-------+-------+   |   PostgreSQL  |   | Translation |   |
-|   +-------+-------+   |  RAG Engine   |   |  (Videos +   |   |  Layer +    |   |
-|           |            | (FAISS in     |   |   QA History) |   |  Validation |   |
-|           v            |  Redis)       |   +---------------+   +-------------+   |
-|   +-------+-------+   +---------------+                                          |
-+-----------+----------------------------------------------+---+
++------------------------------------------------------------------------------------+
+|                       FastAPI / aiogram                                            |
+|                                                                                    |
+|   +---------------+   +---------------+   +-------------+                          |
+|   | Bot Handlers  |   | Rate Limiter  |   | API Routes  |                          |
+|   | (/start,/help |   | (Atomic Lua)  |   | (/health)   |                          |
+|   |  /summary,    |   +-------+-------+   +-------------+                          |
+|   |  /deepdive,   |          |                                                     |
+|   |  /actionpoints|          v                                                     |
+|   |  /language)   |   +-------+-------+                                            |
+|   +-------+-------+   | Redis (Cache  |                                            |
+|           |           | + Sessions +  |                                            |
+|           v           | Rate Limits)  |                                            |
+|   +-------+-------+   +---------------+                                            |
+|   |  Task Queue   |                       +-------+-------+   +-------+-----+      |
+|   | (Celery)      |   +-------+-------+   |   PostgreSQL  |   | Translation |      |
+|   +-------+-------+   |  RAG Engine   |   |  (Videos +    |   |  Layer +    |      |
+|           |           | (FAISS in     |   |   QA History) |   |  Validation |      |
+|           v           |  Redis)       |   +---------------+   +-------------+      |
+|   +-------+-------+   +---------------+                                            |
++-----------+------------------------------------------------------------------------+
             |
             +------------+--------------------+
             |            |                    |
