@@ -1,4 +1,6 @@
 #!/bin/bash
+export HF_HUB_DISABLE_PROGRESS_BARS=1
+
 # Start Celery worker in the background
 celery -A app.core.celery_app.celery_app worker --loglevel=info --concurrency=1 &
 
