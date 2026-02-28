@@ -101,17 +101,17 @@ The core technology stack (transcript extraction → chunking → embedding → 
    ```
 5. Open Telegram and send `/start` to your bot.
 
-## Deployment (Free Tier Strategy)
+## Deployment Strategy
 
-To deploy this bot 24/7 for **$0/month**, use the "Split & Conquer" architecture separating compute from storage:
+To deploy this bot reliably, use a "Split & Conquer" architecture to separate the main Bot API from background workers (to distribute memory load):
 
-1. **Database:** Create a free PostgreSQL database on [Supabase](https://supabase.com).
-2. **Cache & Broker:** Create a free Serverless Redis database on [Upstash](https://upstash.com/redis).
-3. **Compute (Bot & Celery):** Deploy to [Render.com](https://render.com) Web Services.
-   - Connect your GitHub repo.
-   - Add your `.env` variables via the Render dashboard, using the connection strings from Supabase and Upstash.
-   - Render will automatically build the `Dockerfile` and run the FastAPI/aiogram process.
-   - Create a separate "Background Worker" on Render with the start command: `celery -A app.core.celery_app.celery_app worker --loglevel=info`.
+1. **Database:** Create a PostgreSQL database on [Supabase](https://supabase.com).
+2. **Cache & Broker:** Create a Serverless Redis database on [Upstash](https://upstash.com/redis).
+3. **Compute (Bot & Celery):** Deploy to [Railway.app](https://railway.app).
+   - Create a new project and connect your GitHub repo.
+   - Add your `.env` variables via the Railway dashboard, using the connection strings from Supabase and Upstash.
+   - Railway will automatically build the `Dockerfile` and run the FastAPI/aiogram process (Main Service).
+   - Add the repo again as a **second service** in the same project to act as the Celery worker. Override its start command to: `celery -A app.core.celery_app.celery_app worker --loglevel=info`.
 
 ## Demo Commands (in Telegram)
 
