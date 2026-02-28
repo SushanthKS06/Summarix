@@ -23,7 +23,7 @@ RUN pip install \
     -r requirements.txt
 
 # Pre-download SentenceTransformer model to speed up startup
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+RUN python -c "import os; os.environ['HF_HUB_DISABLE_PROGRESS_BARS']='1'; from sentence_transformers import SentenceTransformer; SentenceTransformer('paraphrase-albert-small-v2')"
 
 # Copy application files
 COPY . .
