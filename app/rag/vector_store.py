@@ -11,7 +11,7 @@ os.makedirs(FAISS_DIR, exist_ok=True)
 
 
 class VectorStore:
-    def __init__(self, video_id: str, dimension: int = 384):
+    def __init__(self, video_id: str, dimension: int = 768):
         self.video_id = video_id
         self.dimension = dimension
         self.index_path = os.path.join(FAISS_DIR, f"{video_id}.index")

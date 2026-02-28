@@ -10,9 +10,10 @@ def _get_model():
     """Lazy load the SentenceTransformer model to avoid multiprocessing overhead."""
     global _model
     if _model is None:
-        logger.info("Loading SentenceTransformer model ('all-MiniLM-L6-v2')...")
+        logger.info("Loading SentenceTransformer model ('paraphrase-albert-small-v2')...")
         try:
-            _model = SentenceTransformer('all-MiniLM-L6-v2')
+            # We use a much smaller model here (43MB vs 90MB) to fit into Railway's 500MB free tier RAM limit
+            _model = SentenceTransformer('paraphrase-albert-small-v2')
             logger.info("Model loaded successfully.")
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
