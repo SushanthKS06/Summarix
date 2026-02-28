@@ -131,7 +131,6 @@ To deploy this bot reliably, use a "Split & Conquer" architecture to separate th
 
 ## Example Screenshots
 
-> **Note**: Replace these placeholders with actual screenshots from your bot interaction.
 
 ### 1. Sending a YouTube Link & Getting a Summary
 ![Summary Generation 1](asserts/image1.png)
