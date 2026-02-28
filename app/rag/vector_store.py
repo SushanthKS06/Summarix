@@ -1,45 +1,58 @@
-import os
 import json
-import fcntl
 import faiss
 import numpy as np
+import redis
+from app.core.config import settings
 from app.rag.embeddings import get_embeddings, get_embedding
+import logging
 
-# Use a mounted volume for cross-process shared FAISS data
-FAISS_DIR = "/app/data/faiss"
-os.makedirs(FAISS_DIR, exist_ok=True)
+logger = logging.getLogger(__name__)
 
+# Synchronous Redis client for blocking Celery & FAISS ops
+_sync_redis = redis.from_url(settings.REDIS_URL, decode_responses=False)
+
+FAISS_TTL = 86400  # 24 hours expiry for embeddings to save RAM/Redis memory
 
 class VectorStore:
     def __init__(self, video_id: str, dimension: int = 768):
         self.video_id = video_id
-        self.dimension = dimension
-        self.index_path = os.path.join(FAISS_DIR, f"{video_id}.index")
-        self.meta_path = os.path.join(FAISS_DIR, f"{video_id}.meta.json")
-        self.lock_path = os.path.join(FAISS_DIR, f"{video_id}.lock")
+        # Use a dimension of 384 since we switched to paraphrase-albert-small-v2
+        self.dimension = 768
+        self.index_key = f"faiss_index:{video_id}"
+        self.meta_key = f"faiss_meta:{video_id}"
         
         self._load()
     
     def _load(self):
-        """Load FAISS index and metadata from disk with file locking."""
-        if os.path.exists(self.index_path) and os.path.exists(self.meta_path):
-            with open(self.lock_path, 'w') as lock_file:
-                fcntl.flock(lock_file, fcntl.LOCK_SH)  # Shared read lock
-                try:
-                    self.index = faiss.read_index(self.index_path)
-                    with open(self.meta_path, 'r', encoding='utf-8') as f:
-                        self.metadata = json.load(f)
-                finally:
-                    fcntl.flock(lock_file, fcntl.LOCK_UN)
+        """Load FAISS index and metadata from Redis."""
+        index_data = _sync_redis.get(self.index_key)
+        meta_data = _sync_redis.get(self.meta_key)
+        
+        if index_data and meta_data:
+            try:
+                # Deserialize from bytes to numpy array, then to FAISS index
+                index_np = np.frombuffer(index_data, dtype=np.uint8)
+                self.index = faiss.deserialize_index(index_np)
+                self.metadata = json.loads(meta_data.decode('utf-8'))
+            except Exception as e:
+                logger.error(f"Failed to deserialize FAISS index from Redis: {e}")
+                self.index = faiss.IndexFlatIP(self.dimension)
+                self.metadata = []
         else:
             # Cosine similarity: use Inner Product on L2-normalized vectors
             self.index = faiss.IndexFlatIP(self.dimension)
             self.metadata = []
 
     def add_chunks(self, chunks: list[dict]):
-        """Add chunks with embeddings to the index (with exclusive file lock)."""
+        """Add chunks, update the FAISS index, and persist to Redis."""
         texts = [chunk['text'] for chunk in chunks]
         embeddings = np.array(get_embeddings(texts)).astype("float32")
+        
+        # Override dimension if starting fresh to match actual embedding shape
+        if self.index.ntotal == 0 and embeddings.shape[1] > 0:
+            if embeddings.shape[1] != self.dimension:
+                self.dimension = embeddings.shape[1]
+                self.index = faiss.IndexFlatIP(self.dimension)
         
         # L2 normalize for cosine similarity via inner product
         faiss.normalize_L2(embeddings)
@@ -47,15 +60,19 @@ class VectorStore:
         self.index.add(embeddings)
         self.metadata.extend(chunks)
         
-        # Write with exclusive lock to prevent concurrent corruption
-        with open(self.lock_path, 'w') as lock_file:
-            fcntl.flock(lock_file, fcntl.LOCK_EX)  # Exclusive write lock
-            try:
-                faiss.write_index(self.index, self.index_path)
-                with open(self.meta_path, 'w', encoding='utf-8') as f:
-                    json.dump(self.metadata, f)
-            finally:
-                fcntl.flock(lock_file, fcntl.LOCK_UN)
+        try:
+            # Serialize the updated index to a numpy array, then to bytes
+            index_np = faiss.serialize_index(self.index)
+            index_bytes = index_np.tobytes()
+            meta_bytes = json.dumps(self.metadata).encode('utf-8')
+            
+            # Save into Redis with TTL using pipeline for atomicity
+            pipe = _sync_redis.pipeline()
+            pipe.setex(self.index_key, FAISS_TTL, index_bytes)
+            pipe.setex(self.meta_key, FAISS_TTL, meta_bytes)
+            pipe.execute()
+        except Exception as e:
+            logger.error(f"Failed to serialize/save FAISS index to Redis: {e}")
 
     def search(self, query: str, top_k: int = 3) -> list[dict]:
         """Search for the top-k most similar chunks using cosine similarity."""
