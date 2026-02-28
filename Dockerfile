@@ -28,12 +28,12 @@ RUN python -c "import os; os.environ['HF_HUB_DISABLE_PROGRESS_BARS']='1'; from s
 # Copy application files
 COPY . .
 
+# Set environment variables for memory and logs optimization
+ENV HF_HUB_DISABLE_PROGRESS_BARS=1 \
+    MALLOC_ARENA_MAX=2
+
 # Expose FastAPI port
 EXPOSE 8000
 
-# Copy start script
-COPY start.sh .
-RUN chmod +x start.sh
-
-# Start using the script
-CMD ["./start.sh"]
+# Default command (can be overridden by Railway/docker-compose)
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
