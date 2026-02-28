@@ -2,6 +2,8 @@
 
 A production-ready Telegram bot that acts as your personal AI research assistant for YouTube videos. It fetches transcripts, generates structured summaries, and allows you to chat with the video content using Retrieval-Augmented Generation (RAG).
 
+**Bot Link:** [@MyYTSummarizerBot](https://t.me/MyYTSummarizerBot)
+
 ## Architecture Diagram
 
 ```ascii
